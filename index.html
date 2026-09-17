@@ -1,150 +1,155 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Ramadan Leaderboard</title>
-
-    <style>
-        body {
-            margin: 0;
-            font-family: Segoe UI;
-            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-            color: white;
-            text-align: center;
-        }
-
-        .card {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 20px;
-            margin: 20px auto;
-            max-width: 700px;
-            border-radius: 15px;
-        }
-
-        input,
-        select,
-        button {
-            padding: 10px;
-            margin: 5px;
-            border-radius: 8px;
-            border: none;
-        }
-
-        button {
-            background: #00c9a7;
-            color: white;
-            cursor: pointer;
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pico W Internet Monitor</title>
+    <!-- Tailwind CSS for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js for the live telemetry graph -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen p-6">
 
-<body>
+    <div class="max-w-6xl mx-auto space-y-6">
+        <!-- Top Header Bar -->
+        <header class="flex justify-between items-center bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-lg">
+            <div>
+                <h1 class="text-xl font-bold flex items-center gap-2">
+                    ⚡ Pico W Internet Monitor
+                </h1>
+                <p class="text-xs text-slate-400">Real-time link quality, latency & consistency telemetry</p>
+            </div>
+            <div class="flex gap-3">
+                <button id="refresh-btn" class="bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg text-sm font-medium border border-slate-700 transition">Refresh</button>
+                <button id="export-btn" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg text-sm font-medium transition">Export CSV Log</button>
+            </div>
+        </header>
 
-    <h1>🌙 Ramadan Leaderboard</h1>
+        <!-- Status Banner -->
+        <div id="status-banner" class="bg-emerald-950/40 border border-emerald-800/60 p-4 rounded-xl flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <span id="status-dot" class="h-3 w-3 rounded-full bg-emerald-500 animate-pulse"></span>
+                <div>
+                    <h2 id="status-title" class="font-semibold text-emerald-400">Connection Optimal</h2>
+                    <p id="status-desc" class="text-xs text-emerald-300/80">Internet connection is fast and stable</p>
+                </div>
+            </div>
+            <div class="text-xs text-slate-400 space-x-4 flex">
+                <span>IP: <strong id="val-ip" class="text-slate-200">127.0.0.1</strong></span>
+                <span>Uptime: <strong id="val-uptime" class="text-slate-200">0m 0s</strong></span>
+                <span>Target: <strong class="text-slate-200">1.1.1.1 / 8.8.8.8</strong></span>
+            </div>
+        </div>
 
-    <div class="card">
-        <select id="student">
-            <option>Student1</option>
-            <option>Student2</option>
-            <option>Student3</option>
-            <option>Student4</option>
-            <option>Student5</option>
-            <option>Student6</option>
-        </select>
+        <!-- Metrics Grid Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <!-- RSSI Card -->
+            <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Wi-Fi Signal (RSSI)</p>
+                <p id="val-rssi" class="text-2xl font-bold mt-2">- dBm</p>
+                <p class="text-xs text-slate-500 mt-1">Signal strength</p>
+            </div>
+            <!-- Latency Card -->
+            <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Internet Latency (RTT)</p>
+                <p id="val-latency" class="text-2xl font-bold mt-2">0 ms</p>
+                <p class="text-xs text-slate-500 mt-1">Round trip time</p>
+            </div>
+            <!-- Jitter Card -->
+            <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Consistency / Jitter</p>
+                <p id="val-jitter" class="text-2xl font-bold mt-2">±0.0 ms</p>
+                <p class="text-xs text-slate-500 mt-1">Variance</p>
+            </div>
+            <!-- Packet Loss Card -->
+            <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Packet Loss Rate</p>
+                <p id="val-loss" class="text-2xl font-bold mt-2">0 %</p>
+                <p class="text-xs text-slate-500 mt-1">Buffer tracking</p>
+            </div>
+        </div>
 
-        <input type="password" id="password" placeholder="Password">
-        <br>
-        <input type="number" id="points" placeholder="Points">
-        <button onclick="addPoints()">Submit</button>
+        <!-- Latency Chart Section -->
+        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-semibold text-sm text-slate-300">Latency (RTT) History</h3>
+                <span class="text-xs bg-slate-800 px-3 py-1 rounded-full text-slate-400 border border-slate-700">Live Feed</span>
+            </div>
+            <div class="h-64 relative">
+                <canvas id="latencyChart"></canvas>
+            </div>
+        </div>
     </div>
+    
+    <script>
+        // REPLACE THIS with your Pico W's actual IP address printed in Thonny
+        const PICO_IP = "100.110.162.89"; 
 
-    <div class="card">
-        <h2>Leaderboard</h2>
-        <table width="100%">
-            <thead>
-                <tr>
-                    <th>Rank</th>
-                    <th>Name</th>
-                    <th>Points</th>
-                </tr>
-            </thead>
-            <tbody id="board"></tbody>
-        </table>
-    </div>
-
-    <script type="module">
-
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyAkK0Ms3Aag8mJIHNABh9ezn6GwF7cEdMA",
-            authDomain: "ramadanleaderboard.firebaseapp.com",
-            projectId: "ramadanleaderboard",
-            storageBucket: "ramadanleaderboard.firebasestorage.app",
-            messagingSenderId: "232322501695",
-            appId: "1:232322501695:web:0505dad9662c9a2c45bc8a",
-            measurementId: "G-7186VQPMVL"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-
-        const passwords = {
-            Student1: "1111",
-            Student2: "2222",
-            Student3: "3333",
-            Student4: "4444",
-            Student5: "5555",
-            Student6: "6666"
-        };
-
-        async function addPoints() {
-            const name = document.getElementById("student").value;
-            const pass = document.getElementById("password").value;
-            const pts = parseInt(document.getElementById("points").value);
-
-            if (pass !== passwords[name]) {
-                alert("Wrong password");
-                return;
+        // Initialize Chart.js
+        const ctx = document.getElementById('latencyChart').getContext('2d');
+        const latencyChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'RTT Latency (ms)',
+                    data: [],
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8' } },
+                    y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8' } }
+                }
             }
-
-            const ref = doc(db, "leaderboard", name);
-            const snap = await getDoc(ref);
-            let current = snap.exists() ? snap.data().points : 0;
-
-            await setDoc(ref, {
-                name: name,
-                points: current + pts
-            });
-
-            document.getElementById("points").value = "";
-        }
-
-        onSnapshot(collection(db, "leaderboard"), (snapshot) => {
-            let data = [];
-            snapshot.forEach(doc => {
-                data.push(doc.data());
-            });
-
-            data.sort((a, b) => b.points - a.points);
-
-            const board = document.getElementById("board");
-            board.innerHTML = "";
-
-            data.forEach((item, index) => {
-                board.innerHTML += `
-      <tr>
-        <td>${index + 1}</td>
-        <td>${item.name}</td>
-        <td>${item.points}</td>
-      </tr>
-    `;
-            });
         });
 
+        // Function to fetch data from the Pico
+        async function fetchTelemetry() {
+            try {
+                let response = await fetch(`http://${PICO_IP}/api/data`);
+                let data = await response.json();
+
+                // Update UI Cards
+                document.getElementById('val-rssi').innerText = `${data.rssi} dBm`;
+                document.getElementById('val-latency').innerText = `${data.latency} ms`;
+                document.getElementById('val-loss').innerText = `${data.packet_loss} %`;
+                document.getElementById('val-uptime').innerText = `${data.uptime}`;
+                document.getElementById('val-ip').innerText = PICO_IP;
+
+                // Update Chart with new data point
+                let timeNow = new Date().toLocaleTimeString();
+                if (latencyChart.data.labels.length > 20) {
+                    latencyChart.data.labels.shift();
+                    latencyChart.data.datasets[0].data.shift();
+                }
+                latencyChart.data.labels.push(timeNow);
+                latencyChart.data.datasets[0].data.push(data.latency);
+                latencyChart.update();
+
+            } catch (error) {
+                console.error("Failed to fetch telemetry from Pico:", error);
+                document.getElementById('status-title').innerText = "Connection Lost";
+                document.getElementById('status-desc').innerText = "Could not reach Pico W API endpoint";
+            }
+        }
+
+        // Run fetch every 3 seconds
+        setInterval(fetchTelemetry, 3000);
+        
+        // Manual refresh button
+        document.getElementById('refresh-btn').addEventListener('click', fetchTelemetry);
     </script>
 </body>
+</html>
 
+</body>
 </html>
