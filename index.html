@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Ramadan Leaderboard</title>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Segoe UI;
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            color: white;
+            text-align: center;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            margin: 20px auto;
+            max-width: 700px;
+            border-radius: 15px;
+        }
+
+        input,
+        select,
+        button {
+            padding: 10px;
+            margin: 5px;
+            border-radius: 8px;
+            border: none;
+        }
+
+        button {
+            background: #00c9a7;
+            color: white;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>🌙 Ramadan Leaderboard</h1>
+
+    <div class="card">
+        <select id="student">
+            <option>Student1</option>
+            <option>Student2</option>
+            <option>Student3</option>
+            <option>Student4</option>
+            <option>Student5</option>
+            <option>Student6</option>
+        </select>
+
+        <input type="password" id="password" placeholder="Password">
+        <br>
+        <input type="number" id="points" placeholder="Points">
+        <button onclick="addPoints()">Submit</button>
+    </div>
+
+    <div class="card">
+        <h2>Leaderboard</h2>
+        <table width="100%">
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>Name</th>
+                    <th>Points</th>
+                </tr>
+            </thead>
+            <tbody id="board"></tbody>
+        </table>
+    </div>
+
+    <script type="module">
+
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAkK0Ms3Aag8mJIHNABh9ezn6GwF7cEdMA",
+            authDomain: "ramadanleaderboard.firebaseapp.com",
+            projectId: "ramadanleaderboard",
+            storageBucket: "ramadanleaderboard.firebasestorage.app",
+            messagingSenderId: "232322501695",
+            appId: "1:232322501695:web:0505dad9662c9a2c45bc8a",
+            measurementId: "G-7186VQPMVL"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        const passwords = {
+            Student1: "1111",
+            Student2: "2222",
+            Student3: "3333",
+            Student4: "4444",
+            Student5: "5555",
+            Student6: "6666"
+        };
+
+        async function addPoints() {
+            const name = document.getElementById("student").value;
+            const pass = document.getElementById("password").value;
+            const pts = parseInt(document.getElementById("points").value);
+
+            if (pass !== passwords[name]) {
+                alert("Wrong password");
+                return;
+            }
+
+            const ref = doc(db, "leaderboard", name);
+            const snap = await getDoc(ref);
+            let current = snap.exists() ? snap.data().points : 0;
+
+            await setDoc(ref, {
+                name: name,
+                points: current + pts
+            });
+
+            document.getElementById("points").value = "";
+        }
+
+        onSnapshot(collection(db, "leaderboard"), (snapshot) => {
+            let data = [];
+            snapshot.forEach(doc => {
+                data.push(doc.data());
+            });
+
+            data.sort((a, b) => b.points - a.points);
+
+            const board = document.getElementById("board");
+            board.innerHTML = "";
+
+            data.forEach((item, index) => {
+                board.innerHTML += `
+      <tr>
+        <td>${index + 1}</td>
+        <td>${item.name}</td>
+        <td>${item.points}</td>
+      </tr>
+    `;
+            });
+        });
+
+    </script>
+</body>
+
+</html>
