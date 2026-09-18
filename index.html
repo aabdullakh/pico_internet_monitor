@@ -36,7 +36,7 @@
                 </div>
             </div>
             <div class="text-xs text-slate-400 space-x-4 flex">
-                <span>IP: <strong id="val-ip" class="text-slate-200">127.0.0.1</strong></span>
+                <span>Last updated: <strong id="val-updated" class="text-slate-200">-</strong></span>
                 <span>Uptime: <strong id="val-uptime" class="text-slate-200">0m 0s</strong></span>
                 <span>Target: <strong class="text-slate-200">1.1.1.1 / 8.8.8.8</strong></span>
             </div>
@@ -83,8 +83,13 @@
     </div>
     
     <script>
-        // REPLACE THIS with your Pico W's actual IP address printed in Thonny
-        const PICO_IP = "100.110.162.89"; 
+        // Adafruit IO username is public; the feed itself is public and needs no key to read.
+        // Note: Adafruit IO's /data/last shortcut always requires a key, even on public feeds,
+        // so we read the feed resource directly instead (last_value / updated_at), which is
+        // reachable with no key as long as the feed's visibility is "public".
+        const AIO_USER = "abduzadr";
+        const FEED_URL = `https://io.adafruit.com/api/v2/${AIO_USER}/feeds/intern-monitor`;
+        const STALE_MS = 60000;
 
         // Initialize Chart.js
         const ctx = document.getElementById('latencyChart').getContext('2d');
@@ -112,21 +117,58 @@
             }
         });
 
-        // Function to fetch data from the Pico
+        function formatUptime(seconds) {
+            seconds = Math.max(0, Math.floor(seconds));
+            const m = Math.floor(seconds / 60);
+            const s = seconds % 60;
+            return `${m}m ${s}s`;
+        }
+
+        function setOffline(reason) {
+            document.getElementById('status-dot').classList.remove('bg-emerald-500', 'animate-pulse');
+            document.getElementById('status-dot').classList.add('bg-red-500');
+            document.getElementById('status-title').innerText = "Offline";
+            document.getElementById('status-desc').innerText = reason;
+        }
+
+        function setOptimal(desc) {
+            document.getElementById('status-dot').classList.remove('bg-red-500');
+            document.getElementById('status-dot').classList.add('bg-emerald-500', 'animate-pulse');
+            document.getElementById('status-title').innerText = "Connection Optimal";
+            document.getElementById('status-desc').innerText = desc;
+        }
+
+        // Function to fetch the latest data point from Adafruit IO
         async function fetchTelemetry() {
             try {
-                let response = await fetch(`http://${PICO_IP}/api/data`);
-                let data = await response.json();
+                let response = await fetch(FEED_URL);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                let feed = await response.json();
+                let data = JSON.parse(feed.last_value);
+
+                let createdAt = new Date(feed.updated_at);
+                let ageMs = Date.now() - createdAt.getTime();
 
                 // Update UI Cards
                 document.getElementById('val-rssi').innerText = `${data.rssi} dBm`;
                 document.getElementById('val-latency').innerText = `${data.latency} ms`;
+                document.getElementById('val-jitter').innerText = `±${data.jitter.toFixed(1)} ms`;
                 document.getElementById('val-loss').innerText = `${data.packet_loss} %`;
-                document.getElementById('val-uptime').innerText = `${data.uptime}`;
-                document.getElementById('val-ip').innerText = PICO_IP;
+                document.getElementById('val-uptime').innerText = formatUptime(data.uptime);
+                document.getElementById('val-updated').innerText = createdAt.toLocaleTimeString();
+
+                if (ageMs > STALE_MS) {
+                    setOffline("No fresh data from the Pico in over a minute");
+                } else if (data.status === "Disconnected") {
+                    setOffline("Pico reports it cannot reach the internet");
+                } else {
+                    setOptimal("Internet connection is fast and stable");
+                }
 
                 // Update Chart with new data point
-                let timeNow = new Date().toLocaleTimeString();
+                let timeNow = createdAt.toLocaleTimeString();
                 if (latencyChart.data.labels.length > 20) {
                     latencyChart.data.labels.shift();
                     latencyChart.data.datasets[0].data.shift();
@@ -136,20 +178,17 @@
                 latencyChart.update();
 
             } catch (error) {
-                console.error("Failed to fetch telemetry from Pico:", error);
-                document.getElementById('status-title').innerText = "Connection Lost";
-                document.getElementById('status-desc').innerText = "Could not reach Pico W API endpoint";
+                console.error("Failed to fetch telemetry from Adafruit IO:", error);
+                setOffline("Could not reach Adafruit IO feed");
             }
         }
 
-        // Run fetch every 3 seconds
-        setInterval(fetchTelemetry, 3000);
+        // Poll every 10 seconds (matches the Pico's post interval)
+        fetchTelemetry();
+        setInterval(fetchTelemetry, 10000);
         
         // Manual refresh button
         document.getElementById('refresh-btn').addEventListener('click', fetchTelemetry);
     </script>
-</body>
-</html>
-
 </body>
 </html>
