@@ -27,18 +27,18 @@
         </header>
 
         <!-- Status Banner -->
-        <div id="status-banner" class="bg-emerald-950/40 border border-emerald-800/60 p-4 rounded-xl flex items-center justify-between">
+        <div id="status-banner" class="bg-slate-900 border border-slate-800 p-4 rounded-xl flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <span id="status-dot" class="h-3 w-3 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span id="status-dot" class="h-3 w-3 rounded-full bg-slate-500 animate-pulse"></span>
                 <div>
-                    <h2 id="status-title" class="font-semibold text-emerald-400">Connection Optimal</h2>
-                    <p id="status-desc" class="text-xs text-emerald-300/80">Internet connection is fast and stable</p>
+                    <h2 id="status-title" class="font-semibold text-slate-300">Loading…</h2>
+                    <p id="status-desc" class="text-xs text-slate-400">Waiting for the first reading from the Pico</p>
                 </div>
             </div>
             <div class="text-xs text-slate-400 space-x-4 flex">
                 <span>Last updated: <strong id="val-updated" class="text-slate-200">-</strong></span>
                 <span>Uptime: <strong id="val-uptime" class="text-slate-200">0m 0s</strong></span>
-                <span>Target: <strong class="text-slate-200">1.1.1.1 / 8.8.8.8</strong></span>
+                <span>Target: <strong class="text-slate-200">1.1.1.1</strong></span>
             </div>
         </div>
 
@@ -66,7 +66,7 @@
             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
                 <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Packet Loss Rate</p>
                 <p id="val-loss" class="text-2xl font-bold mt-2">0 %</p>
-                <p class="text-xs text-slate-500 mt-1">Buffer tracking</p>
+                <p class="text-xs text-slate-500 mt-1">Failed connection tests</p>
             </div>
         </div>
 
@@ -124,18 +124,38 @@
             return `${m}m ${s}s`;
         }
 
+        // Banner colour schemes, keyed by status tone
+        const STATUS_STYLES = {
+            optimal:  { banner: 'bg-emerald-950/40 border-emerald-800/60', dot: 'bg-emerald-500 animate-pulse', title: 'text-emerald-400', desc: 'text-emerald-300/80' },
+            degraded: { banner: 'bg-amber-950/40 border-amber-800/60',     dot: 'bg-amber-400 animate-pulse',   title: 'text-amber-400',   desc: 'text-amber-300/80' },
+            offline:  { banner: 'bg-red-950/40 border-red-800/60',         dot: 'bg-red-500',                   title: 'text-red-400',     desc: 'text-red-300/80' }
+        };
+        const BASE_CLASSES = {
+            banner: 'border p-4 rounded-xl flex items-center justify-between',
+            dot: 'h-3 w-3 rounded-full',
+            title: 'font-semibold',
+            desc: 'text-xs'
+        };
+
+        function setStatus(tone, title, desc) {
+            const style = STATUS_STYLES[tone];
+            for (const part of ['banner', 'dot', 'title', 'desc']) {
+                document.getElementById(`status-${part}`).className = `${BASE_CLASSES[part]} ${style[part]}`;
+            }
+            document.getElementById('status-title').innerText = title;
+            document.getElementById('status-desc').innerText = desc;
+        }
+
         function setOffline(reason) {
-            document.getElementById('status-dot').classList.remove('bg-emerald-500', 'animate-pulse');
-            document.getElementById('status-dot').classList.add('bg-red-500');
-            document.getElementById('status-title').innerText = "Offline";
-            document.getElementById('status-desc').innerText = reason;
+            setStatus('offline', "Offline", reason);
+        }
+
+        function setDegraded(desc) {
+            setStatus('degraded', "Connection Degraded", desc);
         }
 
         function setOptimal(desc) {
-            document.getElementById('status-dot').classList.remove('bg-red-500');
-            document.getElementById('status-dot').classList.add('bg-emerald-500', 'animate-pulse');
-            document.getElementById('status-title').innerText = "Connection Optimal";
-            document.getElementById('status-desc').innerText = desc;
+            setStatus('optimal', "Connection Optimal", desc);
         }
 
         // Function to fetch the latest data point from Adafruit IO
@@ -163,6 +183,8 @@
                     setOffline("No fresh data from the Pico in over a minute");
                 } else if (data.status === "Disconnected") {
                     setOffline("Pico reports it cannot reach the internet");
+                } else if (data.status === "Degraded") {
+                    setDegraded(`${data.packet_loss}% of connection tests failed`);
                 } else {
                     setOptimal("Internet connection is fast and stable");
                 }

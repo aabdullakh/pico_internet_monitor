@@ -14,8 +14,8 @@ wlan.active(True)
 
 boot_time = time.time()
 
-# --- Global tracking variable for Jitter ---
-last_latency = 0
+# --- Number of connection probes per telemetry reading ---
+PROBES = 5
 
 
 def connect_wifi():
@@ -34,37 +34,44 @@ def connect_wifi():
     return False
 
 
-# --- Helper Function to Measure Telemetry ---
-def get_telemetry():
-    global last_latency
-    rssi = wlan.status('rssi')
-    start_time = time.ticks_ms()
-
+# --- Helper Functions to Measure Telemetry ---
+def probe_once():
+    """Time one TCP connect to 1.1.1.1:80. Returns latency in ms, or None on failure."""
+    s = None
     try:
-        addr_info = socket.getaddrinfo('1.1.1.1', 80)
-        addr = addr_info[0][-1]
-
+        addr = socket.getaddrinfo('1.1.1.1', 80)[0][-1]
         s = socket.socket()
         s.settimeout(2.0)
+        start_time = time.ticks_ms()
         s.connect(addr)
-        s.close()
-
-        latency = time.ticks_diff(time.ticks_ms(), start_time)
-        status = "Optimal"
-        packet_loss = 0
-
-        # Calculate Jitter (difference from last read)
-        if last_latency > 0:
-            jitter = abs(latency - last_latency)
-        else:
-            jitter = 0
-        last_latency = latency
-
+        return time.ticks_diff(time.ticks_ms(), start_time)
     except Exception:
+        return None
+    finally:
+        if s is not None:
+            s.close()
+
+
+def get_telemetry():
+    rssi = wlan.status('rssi')
+    results = [probe_once() for _ in range(PROBES)]
+    successes = [r for r in results if r is not None]
+
+    packet_loss = round((PROBES - len(successes)) * 100 / PROBES)
+
+    if successes:
+        latency = round(sum(successes) / len(successes))
+        jitter = max(successes) - min(successes)
+    else:
         latency = 0
         jitter = 0
+
+    if packet_loss == 0:
+        status = "Optimal"
+    elif successes:
+        status = "Degraded"
+    else:
         status = "Disconnected"
-        packet_loss = 100
 
     return {
         "status": status,
